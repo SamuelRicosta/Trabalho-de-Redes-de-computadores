@@ -31,7 +31,7 @@ NAMESPACE = "CIC"
 # @note Altere para o IP Público do servidor se não estiver testando localmente.
 # Para teste local (mesma máquina), use "127.0.0.1".
 #RENDEZVOUS_HOST = "127.0.0.1" 
-RENDEZVOUS_HOST = ""
+RENDEZVOUS_HOST = "45.171.101.167"
 RENDEZVOUS_PORT = 8080
 
 def exibir_mensagem(id_peer: str, msg: dict) -> None:
