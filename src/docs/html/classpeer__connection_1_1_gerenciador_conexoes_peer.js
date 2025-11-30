@@ -1,0 +1,28 @@
+var classpeer__connection_1_1_gerenciador_conexoes_peer =
+[
+    [ "__init__", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a62cef3830f66150365775b63c81af15e", null ],
+    [ "_enviar_mensagem", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a72c5b94711eda69282d5f94878a27fb9", null ],
+    [ "_loop_recebimento", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#ac96f4804c13038d2db122e9743c87462", null ],
+    [ "_loop_servidor", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a1b12ba10f2a3ddfdc2a57a2e5294626a", null ],
+    [ "_processar_bye", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a443eacfdf443c40af3d2fb049346793a", null ],
+    [ "_processar_conexao_inbound", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#ae727eb34e6a5ae983d4c77723075f622", null ],
+    [ "_receber_mensagem", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a21670a0bb256506f734406ea17129d4e", null ],
+    [ "_remover_conexao", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#aa3e15c20e09c6168241eaabaee847c31", null ],
+    [ "conectar_a_peer", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#aae45647980f89592210856e2475234bb", null ],
+    [ "desconectar_peer", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#aa271fc15fd4a80517bcbe11347c2f02c", null ],
+    [ "enviar_broadcast", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#afed9d6b19fdf39e9b2659fcfa4854dea", null ],
+    [ "enviar_msg_direta", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a035463891e8f093a62f6ecd61eb92db9", null ],
+    [ "enviar_ping", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a87159b5c9fd4936523361e9598a630f5", null ],
+    [ "esta_conectado", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#af63e82d5c855ab1d2e13d0b1c441ff47", null ],
+    [ "iniciar_servidor", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#ab97a30461c5f59d67ef6375b9091edbc", null ],
+    [ "listar_conexoes", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a7720a1dd4c904aeed228b9d5bc1d29d7", null ],
+    [ "parar_servidor", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#ae2111bf628c199fad164e580ea61ed5c", null ],
+    [ "_conexoes", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a4cf89c4e94049d9046093da0efca82dd", null ],
+    [ "_lock", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a39fe02f86989d8fd9f9374069036ca05", null ],
+    [ "_servidor_rodando", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a8e4258953fc030b0f2606156ac34c939", null ],
+    [ "_servidor_socket", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a45c47096b9ae29b4437a7647af0ad1f0", null ],
+    [ "_thread_servidor", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a2ea077bf64d5be578f6f3e70e2a0b853", null ],
+    [ "callback_mensagem", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a5ad2af85546884c86dd3c87639e77a65", null ],
+    [ "meu_id_peer", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#ab9381d6e12be091872a92feee8e44289", null ],
+    [ "porta_escuta", "classpeer__connection_1_1_gerenciador_conexoes_peer.html#a18cd8f927500c6268301a6aa62580d3c", null ]
+];

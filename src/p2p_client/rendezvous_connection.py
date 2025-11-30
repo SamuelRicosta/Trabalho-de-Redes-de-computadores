@@ -1,19 +1,15 @@
 import json
 import socket
 from typing import List, Optional
-
 from .peer_table import TabelaPeers
 
-
 class ClienteRendezvous:
-    """Cliente para o servidor Rendezvous.
-
-    Responsabilidades principais:
-    - REGISTER: registrar o peer (namespace, nome, porta de escuta, ttl).
-    - DISCOVER: obter lista de peers e atualizar a TabelaPeers local.
-    - UNREGISTER: remover o registro do peer no encerramento.
-
-    O protocolo segue o formato implementado em `src/rendezvous/request_handler.py`.
+    """
+    @brief Cliente responsável pela comunicação com o Servidor Rendezvous.
+    
+    Esta classe gerencia o registro do peer, a descoberta de outros peers
+    e a manutenção da tabela local de peers conhecidos. O protocolo utilizado
+    é baseado em mensagens JSON terminadas em nova linha sobre TCP.
     """
 
     def __init__(
@@ -26,6 +22,17 @@ class ClienteRendezvous:
         ttl: int = 7200,
         timeout: float = 5.0,
     ) -> None:
+        """
+        @brief Inicializa o cliente Rendezvous.
+
+        @param host Endereço IP ou hostname do servidor Rendezvous.
+        @param porta Porta TCP do servidor Rendezvous.
+        @param namespace O namespace (sala) onde o peer irá se registrar.
+        @param nome O nome de usuário do peer.
+        @param porta_escuta A porta TCP onde este peer aceitará conexões P2P.
+        @param ttl Tempo de vida do registro em segundos (padrão: 7200).
+        @param timeout Tempo máximo de espera para respostas do servidor (padrão: 5.0).
+        """
         self.host = host
         self.porta = porta
         self.namespace = namespace
@@ -33,31 +40,35 @@ class ClienteRendezvous:
         self.porta_escuta = porta_escuta
         self.ttl = ttl
         self.timeout = timeout
-
         self.tabela_peers = TabelaPeers()
 
-    # ----------------- helpers internos -----------------
-
     def _enviar_requisicao(self, payload: dict) -> dict:
-        """Abre uma conexão TCP, envia JSON + "\n", lê uma linha de resposta e fecha."""
+        """
+        @brief Envia uma carga JSON para o servidor e aguarda resposta.
+        
+        Este método é interno e gerencia a abertura do socket, envio,
+        leitura da resposta e fechamento da conexão (short-lived connection).
+
+        @param payload Dicionário contendo os dados da requisição.
+        @return Dicionário com a resposta do servidor.
+        @raises RuntimeError Se houver falha na conexão ou resposta inválida.
+        """
         dados = json.dumps(payload)
         dados_bytes = (dados + "\n").encode("utf-8")
 
         with socket.create_connection((self.host, self.porta), timeout=self.timeout) as sock:
             sock.sendall(dados_bytes)
-
+            # ... (código de leitura do buffer)
             buffer = b""
             linha = b""
             while True:
                 pedaco = sock.recv(4096)
-                if not pedaco:
-                    break
+                if not pedaco: break
                 buffer += pedaco
                 if b"\n" in buffer:
-                    linha, _resto = buffer.split(b"\n", 1)
+                    linha, _ = buffer.split(b"\n", 1)
                     break
-            if not linha:
-                linha = buffer
+            if not linha: linha = buffer
 
         if not linha:
             raise RuntimeError("Sem resposta do servidor Rendezvous")
@@ -68,12 +79,14 @@ class ClienteRendezvous:
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"Resposta inválida do Rendezvous: {raw!r}") from exc
 
-    # ----------------- API pública -----------------
-
     def registrar(self) -> dict:
-        """Envia REGISTER e retorna o JSON de resposta.
-
-        Lança RuntimeError em caso de status != OK.
+        """
+        @brief Registra o peer no servidor Rendezvous.
+        
+        Envia o comando REGISTER com os dados do peer (IP, Porta, Nome).
+        
+        @return Dicionário de resposta contendo 'status' e 'ttl'.
+        @raises RuntimeError Se o status da resposta não for 'OK'.
         """
         payload = {
             "type": "REGISTER",
@@ -88,10 +101,16 @@ class ClienteRendezvous:
         return resp
 
     def descobrir(self, namespace: Optional[str] = None) -> List[dict]:
-        """Envia DISCOVER, atualiza a TabelaPeers e retorna a lista de peers (dicts)."""
-        payload = {
-            "type": "DISCOVER",
-        }
+        """
+        @brief Solicita a lista de peers de um namespace.
+
+        Envia o comando DISCOVER e atualiza a TabelaPeers interna com os resultados.
+
+        @param namespace O namespace a ser consultado (opcional).
+        @return Lista de dicionários, onde cada dicionário representa um peer.
+        @raises RuntimeError Se o status da resposta não for 'OK'.
+        """
+        payload = {"type": "DISCOVER"}
         if namespace is not None:
             payload["namespace"] = namespace
 
@@ -103,37 +122,17 @@ class ClienteRendezvous:
         self.tabela_peers.atualizar_do_discover(peers)
         return peers
 
-    def desregistrar(
-        self,
-        namespace: Optional[str] = None,
-        nome: Optional[str] = None,
-        porta: Optional[int] = None,
-    ) -> dict:
-        """Envia UNREGISTER e retorna o JSON de resposta.
-
-        Em caso de erro, não lança exceção automaticamente (para facilitar shutdown),
-        mas quem chama pode inspecionar o campo "status".
+    def desregistrar(self, namespace: Optional[str] = None, nome: Optional[str] = None) -> dict:
+        """
+        @brief Remove o registro do peer no servidor.
+        @param namespace O namespace do registro a remover.
+        @param nome O nome do peer a remover.
+        @return Dicionário com a resposta do servidor.
         """
         payload = {
             "type": "UNREGISTER",
             "namespace": namespace or self.namespace,
+            "name": nome or self.nome,
+            "port": self.porta_escuta
         }
-        if nome is not None:
-            payload["name"] = nome
-        else:
-            payload["name"] = self.nome
-
-        if porta is not None:
-            payload["port"] = porta
-        else:
-            payload["port"] = self.porta_escuta
-
         return self._enviar_requisicao(payload)
-
-    def fechar(self) -> None:
-        """Atalho para tentar fazer UNREGISTER no encerramento."""
-        try:
-            self.desregistrar()
-        except Exception:
-            # Em um encerramento, falhas aqui podem ser apenas logadas no futuro
-            pass
