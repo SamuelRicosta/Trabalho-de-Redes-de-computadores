@@ -1,4 +1,23 @@
 """
+# TRABALHO DE REDES DE COMPUTADORES - PROJETO P2P
+#
+# GRUPO: 12
+#
+# INTEGRANTES:
+# 1.Samuel Ribeiro da Costa - 21103146 
+# 2.Ricardo Pedrosa Ramos Filho - 242032587
+#
+#
+# DESCRIÇÃO:
+# Cliente P2P implementado em Python utilizando sockets TCP.
+# O software permite comunicação descentralizada, troca de mensagens
+# e descoberta de peers.
+#
+# REQUISITOS: Python 3.10+ (Linux)
+
+----------------------------------------------------------------
+
+ 
 @file main.py
 @brief Ponto de entrada do Cliente Chat P2P (CLI).
 

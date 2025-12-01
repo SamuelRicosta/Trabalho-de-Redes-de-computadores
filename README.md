@@ -90,5 +90,5 @@ Uma vez conectado, você pode usar os seguintes comandos:
 
 ## Autores
 
-- Samuel
-- Ricardo
+- Samuel Ribeiro da Costa - 21103146 
+- Ricardo Pedrosa Ramos Filho - 242032587
