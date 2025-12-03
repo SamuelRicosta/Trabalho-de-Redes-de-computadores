@@ -165,6 +165,10 @@ class GerenciadorConexoesPeer:
                 return
 
             id_peer_remoto = mensagem.get("peer_id")
+            # Normaliza para lowercase para evitar duplicatas por case
+            if id_peer_remoto and '@' in id_peer_remoto:
+                nome, ns = id_peer_remoto.split('@', 1)
+                id_peer_remoto = f"{nome.lower()}@{ns}"
             
             # 2. Responde com HELLO_OK
             resposta = {
@@ -281,7 +285,7 @@ class GerenciadorConexoesPeer:
             return True
 
         except Exception as e:
-            log.error(f"Erro ao conectar a {id_peer} ({ip}:{porta}): {e}")
+            log.debug(f"Erro ao conectar a {id_peer} ({ip}:{porta}): {e}")
             return False
 
     # =========================================================================
@@ -492,7 +496,7 @@ class GerenciadorConexoesPeer:
                     log.debug(f"Mensagem {tipo} recebida de {id_peer}")
 
         except Exception as e:
-            log.error(f"Erro no loop de recebimento de {id_peer}: {e}")
+            log.debug(f"Erro no loop de recebimento de {id_peer}: {e}")
         finally:
             self._remover_conexao(id_peer)
 

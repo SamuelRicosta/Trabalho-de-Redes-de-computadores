@@ -145,11 +145,11 @@ def tarefa_background(
             
             # 2. Busca peers no servidor
             peers = cliente_rdv.descobrir(namespace=NAMESPACE)
-            meu_id = f"{cliente_rdv.nome}@{cliente_rdv.namespace}"
+            meu_id = f"{cliente_rdv.nome.lower()}@{cliente_rdv.namespace}"
             
             # 3. Conecta a novos peers
             for p in peers:
-                pid = f"{p['name']}@{p['namespace']}"
+                pid = f"{p['name'].lower()}@{p['namespace']}"
                 if pid == meu_id: 
                     continue # Não conectar a si mesmo
                 
@@ -214,7 +214,7 @@ def main() -> None:
     )
     
     gerenciador = GerenciadorConexoesPeer(
-        meu_id_peer=f"{nome}@{NAMESPACE}", 
+        meu_id_peer=f"{nome.lower()}@{NAMESPACE}", 
         porta_escuta=porta, 
         callback_mensagem=exibir_mensagem
     )
@@ -229,7 +229,20 @@ def main() -> None:
         print("Verifique se o servidor Rendezvous está rodando.")
         return
 
-    # 4. Inicia Thread de Background (Discover + Ping)
+    # 4. Faz DISCOVER inicial e tenta conectar aos peers
+    try:
+        peers = cliente_rdv.descobrir(namespace=NAMESPACE)
+        meu_id = f"{cliente_rdv.nome.lower()}@{cliente_rdv.namespace}"
+        for p in peers:
+            pid = f"{p['name'].lower()}@{p['namespace']}"
+            if pid != meu_id:
+                gerenciador.conectar_a_peer(pid, p['ip'], int(p['port']))
+        # Pequeno delay para garantir que as conexões sejam estabelecidas
+        time.sleep(0.5)
+    except Exception:
+        pass
+
+    # 5. Inicia Thread de Background (Discover + Ping)
     t_bg = threading.Thread(
         target=tarefa_background, 
         args=(cliente_rdv, gerenciador, DISCOVER_INTERVAL), 
@@ -237,7 +250,7 @@ def main() -> None:
     )
     t_bg.start()
 
-    # 5. Loop Principal (CLI)
+    # 6. Loop Principal (CLI)
     try:
         while True:
             # Input bloqueante espera o usuário digitar
@@ -254,14 +267,13 @@ def main() -> None:
                 
             # --- Comando PEERS ---
             elif comando == "/peers":
-                peers = cliente_rdv.tabela_peers.listar_todos()
-                print(f"--- Peers Descobertos ({len(peers)}) ---")
-                if not peers:
-                    print(" Nenhum peer descoberto ainda.")
+                conns = gerenciador.listar_conexoes()
+                print(f"--- Peers Conectados ({len(conns)}) ---")
+                if not conns:
+                    print(" Nenhuma conexão ativa.")
                 else:
-                    for p in peers:
-                        status = "CONECTADO" if gerenciador.esta_conectado(p.id_peer) else "Disponível"
-                        print(f" - {p.id_peer} [{p.ip}:{p.porta}] {status}")
+                    for c in conns:
+                        print(f" - {c.id_peer} [{c.ip}:{c.porta}] (Tipo: {c.tipo})")
 
             # --- Comando RTT (Latência) ---
             elif comando == "/rtt":
