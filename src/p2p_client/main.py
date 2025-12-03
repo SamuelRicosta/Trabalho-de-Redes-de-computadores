@@ -31,27 +31,61 @@ import sys
 import threading
 import time
 import logging
-from typing import List
+import json
+from pathlib import Path
+from typing import List, Dict, Any
+from datetime import datetime, timezone
 
 from .rendezvous_connection import ClienteRendezvous
 from .peer_connection import GerenciadorConexoesPeer
 
+# Logger para este módulo
+log = logging.getLogger(__name__)
+
 # =============================================================================
-# Configurações Globais
+# Carregamento de Configurações
 # =============================================================================
 
-# Configuração de Log: 'ERROR' para limpar o terminal para o chat.
-# Mude para 'INFO' ou 'DEBUG' se precisar diagnosticar problemas.
-logging.basicConfig(level=logging.ERROR, format="%(asctime)s [%(levelname)s] %(message)s")
+def carregar_configuracao(caminho: str = "config.json") -> Dict[str, Any]:
+    """
+    @brief Carrega configurações do arquivo JSON.
+    
+    @param caminho Caminho para o arquivo de configuração.
+    @return Dicionário com as configurações ou valores padrão se arquivo não existir.
+    """
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        log.warning(f"Arquivo de configuração '{caminho}' não encontrado. Usando valores padrão.")
+        return {
+            "rendezvous": {"host": "127.0.0.1", "port": 8080},
+            "client": {"namespace": "CIC", "ttl": 7200, "log_level": "ERROR"},
+            "network": {"discover_interval": 10, "ping_interval": 30, "connection_timeout": 5.0}
+        }
+    except json.JSONDecodeError as e:
+        log.error(f"Erro ao parsear JSON: {e}. Usando valores padrão.")
+        return {
+            "rendezvous": {"host": "127.0.0.1", "port": 8080},
+            "client": {"namespace": "CIC", "ttl": 7200, "log_level": "ERROR"},
+            "network": {"discover_interval": 10, "ping_interval": 30, "connection_timeout": 5.0}
+        }
 
-# Constantes de Conexão
-NAMESPACE = "CIC"
+# Carrega configurações do arquivo
+CONFIG = carregar_configuracao()
 
-# @note Altere para o IP Público do servidor se não estiver testando localmente.
-# Para teste local (mesma máquina), use "127.0.0.1".
-#RENDEZVOUS_HOST = "127.0.0.1" 
-RENDEZVOUS_HOST = "45.171.101.167"
-RENDEZVOUS_PORT = 8080
+# Configuração de Log baseada no config.json
+logging.basicConfig(
+    level=getattr(logging, CONFIG["client"]["log_level"], logging.ERROR),
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
+# Constantes extraídas do JSON
+NAMESPACE = CONFIG["client"]["namespace"]
+RENDEZVOUS_HOST = CONFIG["rendezvous"]["host"]
+RENDEZVOUS_PORT = CONFIG["rendezvous"]["port"]
+TTL = CONFIG["client"]["ttl"]
+DISCOVER_INTERVAL = CONFIG["network"]["discover_interval"]
 
 def exibir_mensagem(id_peer: str, msg: dict) -> None:
     """
@@ -68,12 +102,12 @@ def exibir_mensagem(id_peer: str, msg: dict) -> None:
     src = msg.get("src", id_peer)
     
     if tipo == "SEND":
-        print(f"\n📨 [DM] {src} diz: {payload}")
+        print(f"\n[DM] {src} diz: {payload}")
         print("You> ", end="", flush=True) # Restaura o prompt
         
     elif tipo == "PUB":
         dst = msg.get("dst", "*")
-        print(f"\n📢 [PUB {dst}] {src} diz: {payload}")
+        print(f"\n[PUB {dst}] {src} diz: {payload}")
         print("You> ", end="", flush=True) # Restaura o prompt
 
 def tarefa_background(
@@ -85,21 +119,35 @@ def tarefa_background(
     @brief Tarefa de manutenção executada em thread secundária (Daemon).
     
     Realiza periodicamente:
-    1. DISCOVER: Consulta o Rendezvous para encontrar novos peers.
-    2. Auto-Connect: Tenta conectar a peers desconhecidos encontrados.
-    3. Keep-Alive: Envia PING para todos os peers conectados.
+    1. REGISTER: Renova registro no Rendezvous antes de expirar o TTL.
+    2. DISCOVER: Consulta o Rendezvous para encontrar novos peers.
+    3. Auto-Connect: Tenta conectar a peers desconhecidos encontrados.
+    4. Keep-Alive: Envia PING para todos os peers conectados.
 
     @param cliente_rdv Instância do cliente de comunicação com Rendezvous.
     @param gerenciador Instância do gerenciador de conexões P2P.
     @param intervalo Tempo em segundos entre os ciclos de manutenção.
     """
+    contador_ciclos = 0
+    ciclos_para_renovar = (cliente_rdv.ttl // 2) // intervalo  # Renova no meio do TTL
+    
     while True:
         try:
-            # 1. Busca peers no servidor
+            # 1. Renova REGISTER periodicamente (antes de expirar o TTL)
+            if contador_ciclos % ciclos_para_renovar == 0:
+                try:
+                    cliente_rdv.registrar()
+                    log.info("Registro renovado no Rendezvous")
+                except Exception:
+                    pass  # Ignora erros de renovação
+            
+            contador_ciclos += 1
+            
+            # 2. Busca peers no servidor
             peers = cliente_rdv.descobrir(namespace=NAMESPACE)
             meu_id = f"{cliente_rdv.nome}@{cliente_rdv.namespace}"
             
-            # 2. Conecta a novos peers
+            # 3. Conecta a novos peers
             for p in peers:
                 pid = f"{p['name']}@{p['namespace']}"
                 if pid == meu_id: 
@@ -161,7 +209,8 @@ def main() -> None:
         porta=RENDEZVOUS_PORT, 
         namespace=NAMESPACE, 
         nome=nome, 
-        porta_escuta=porta
+        porta_escuta=porta,
+        ttl=TTL
     )
     
     gerenciador = GerenciadorConexoesPeer(
@@ -183,7 +232,7 @@ def main() -> None:
     # 4. Inicia Thread de Background (Discover + Ping)
     t_bg = threading.Thread(
         target=tarefa_background, 
-        args=(cliente_rdv, gerenciador), 
+        args=(cliente_rdv, gerenciador, DISCOVER_INTERVAL), 
         daemon=True
     )
     t_bg.start()
@@ -205,10 +254,14 @@ def main() -> None:
                 
             # --- Comando PEERS ---
             elif comando == "/peers":
-                conns = gerenciador.listar_conexoes()
-                print(f"--- Peers Conectados ({len(conns)}) ---")
-                for c in conns:
-                    print(f" - {c.id_peer} [{c.ip}:{c.porta}] (Desde {c.conectado_em.strftime('%H:%M:%S')})")
+                peers = cliente_rdv.tabela_peers.listar_todos()
+                print(f"--- Peers Descobertos ({len(peers)}) ---")
+                if not peers:
+                    print(" Nenhum peer descoberto ainda.")
+                else:
+                    for p in peers:
+                        status = "CONECTADO" if gerenciador.esta_conectado(p.id_peer) else "Disponível"
+                        print(f" - {p.id_peer} [{p.ip}:{p.porta}] {status}")
 
             # --- Comando RTT (Latência) ---
             elif comando == "/rtt":
@@ -219,7 +272,33 @@ def main() -> None:
                 for c in conns:
                     # Formata para mostrar 2 casas decimais (ex: 45.20 ms)
                     media = c.obter_rtt_medio()
-                    print(f" ⏱️  {c.id_peer}: {media:.2f} ms")
+                    print(f" {c.id_peer}: {media:.2f} ms")
+            
+            # --- Comando CONN (Conexões Ativas) ---
+            elif comando == "/conn":
+                conns = gerenciador.listar_conexoes()
+                print(f"--- Conexões Ativas ({len(conns)}) ---")
+                if not conns:
+                    print(" Nenhuma conexão estabelecida.")
+                else:
+                    inbound = [c for c in conns if c.tipo == "inbound"]
+                    outbound = [c for c in conns if c.tipo == "outbound"]
+                    
+                    if inbound:
+                        print(f"\nINBOUND ({len(inbound)}):")
+                        for c in inbound:
+                            duracao = (datetime.now(timezone.utc) - c.conectado_em).total_seconds()
+                            minutos = int(duracao // 60)
+                            segundos = int(duracao % 60)
+                            print(f"   {c.id_peer} <- {c.ip}:{c.porta} (há {minutos}m{segundos}s)")
+                    
+                    if outbound:
+                        print(f"\nOUTBOUND ({len(outbound)}):")
+                        for c in outbound:
+                            duracao = (datetime.now(timezone.utc) - c.conectado_em).total_seconds()
+                            minutos = int(duracao // 60)
+                            segundos = int(duracao % 60)
+                            print(f"   {c.id_peer} -> {c.ip}:{c.porta} (há {minutos}m{segundos}s)")
                     
             # --- Comando MSG (Direct Message) ---
             elif comando == "/msg":
@@ -232,9 +311,9 @@ def main() -> None:
                 texto = partes[2]
                 
                 if gerenciador.enviar_msg_direta(destino, texto):
-                    print(f"➝ Enviado para {destino}")
+                    print(f"Enviado para {destino}")
                 else:
-                    print(f"⚠️ Falha no envio. Verifique se está conectado a {destino}.")
+                    print(f"Falha no envio. Verifique se está conectado a {destino}.")
                     print("Dica: Use /peers para ver quem está online.")
             
             # --- Comando PUB (Broadcast) ---
@@ -246,11 +325,11 @@ def main() -> None:
                 
                 texto = cmd.split(" ", 1)[1] # Pega tudo após o comando
                 gerenciador.enviar_broadcast(texto, NAMESPACE)
-                print(f"➝ Broadcast enviado para o canal #{NAMESPACE}")
+                print(f"Broadcast enviado para o canal #{NAMESPACE}")
             
             # --- Comando Desconhecido ---
             else:
-                print("Comando inválido. Tente: /msg, /pub, /peers, /rtt ou /quit")
+                print("Comando inválido. Tente: /msg, /pub, /peers, /conn, /rtt ou /quit")
                 
     except KeyboardInterrupt:
         print("\nInterrupção detectada (Ctrl+C).")
@@ -258,14 +337,21 @@ def main() -> None:
     finally:
         # 6. Encerramento Gracioso
         print("\nEncerrando aplicação...")
+        
+        print("Desconectando de peers...")
+        sys.stdout.flush()  # Força flush do buffer
+        
+        gerenciador.parar_servidor()
+        
+        # Aguarda mensagens BYE serem processadas e exibidas
+        time.sleep(1.0)
+        
         try:
             print("Removendo registro no Rendezvous...")
             cliente_rdv.desregistrar()
         except Exception as e:
             print(f"Erro ao desregistrar: {e}")
             
-        print("Parando servidor P2P...")
-        gerenciador.parar_servidor()
         print("Até logo!")
 
 if __name__ == "__main__":

@@ -22,11 +22,36 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
+## Configuração
+
+O projeto utiliza o arquivo `config.json` para configurações:
+
+```json
+{
+  "rendezvous": {
+    "host": "127.0.0.1",     // IP do servidor Rendezvous
+    "port": 8080             // Porta do servidor
+  },
+  "client": {
+    "namespace": "CIC",      // Namespace/sala do chat
+    "ttl": 7200,             // Tempo de vida do registro (segundos)
+    "log_level": "ERROR"     // Nível de log: DEBUG, INFO, ERROR
+  },
+  "network": {
+    "discover_interval": 10, // Intervalo entre DISCOVER (segundos)
+    "ping_interval": 30,     // Intervalo entre PING (segundos)
+    "connection_timeout": 5.0 // Timeout de conexão TCP
+  }
+}
+```
+
+Para usar o servidor remoto, altere `"host": "45.171.101.167"` no `config.json`.
+
 ## Como Rodar
 
 Execute o cliente P2P a partir da raiz do projeto:
 
-```powershell
+```bash
 python -m src.p2p_client.main [PORTA] [NOME]
 ```
 
