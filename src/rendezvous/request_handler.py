@@ -53,8 +53,13 @@ class RequestHandler:
                 return json.dumps({"status": "ERROR", "message": "bad_port"})
             
             try:
+                # Para testes locais, usar 127.0.0.1 se o cliente conectar de localhost
+                ip_to_register = client_ip
+                if client_ip in ("127.0.0.1", "::1", "localhost"):
+                    ip_to_register = "127.0.0.1"
+                
                 peer = PeerRecord(
-                    ip=client_ip,
+                    ip=ip_to_register,
                     port=int(args.get("port")),
                     name=args.get("name"),
                     namespace=args["namespace"],

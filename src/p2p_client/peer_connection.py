@@ -77,6 +77,9 @@ class GerenciadorConexoesPeer:
         self._conexoes: Dict[str, ConexaoPeer] = {}
         self._lock = threading.RLock()
         
+        # Controle de peers já conectados (histórico)
+        self._peers_conhecidos: set = set()
+        
         # Estado do Servidor
         self._servidor_socket: Optional[socket.socket] = None
         self._servidor_rodando = False
@@ -162,6 +165,10 @@ class GerenciadorConexoesPeer:
                 return
 
             id_peer_remoto = mensagem.get("peer_id")
+            # Normaliza para lowercase para evitar duplicatas por case
+            if id_peer_remoto and '@' in id_peer_remoto:
+                nome, ns = id_peer_remoto.split('@', 1)
+                id_peer_remoto = f"{nome.lower()}@{ns}"
             
             # 2. Responde com HELLO_OK
             resposta = {
@@ -172,6 +179,12 @@ class GerenciadorConexoesPeer:
                 "ttl": 1,
             }
             self._enviar_mensagem(cliente_socket, resposta)
+            
+            # Exibe mensagem apenas se for primeira conexão com este peer
+            if id_peer_remoto not in self._peers_conhecidos:
+                print(f"\n[HELLO_OK] Respondido para {id_peer_remoto}")
+                print("You> ", end="", flush=True)
+                self._peers_conhecidos.add(id_peer_remoto)
 
             # 3. Registra a conexão
             with self._lock:
@@ -241,6 +254,12 @@ class GerenciadorConexoesPeer:
                 log.warning(f"Esperava HELLO_OK de {id_peer}, recebeu: {resposta}")
                 sock.close()
                 return False
+            
+            # Exibe mensagem apenas se for primeira conexão com este peer
+            if id_peer not in self._peers_conhecidos:
+                print(f"\n[HELLO_OK] Recebido de {id_peer}")
+                print("You> ", end="", flush=True)
+                self._peers_conhecidos.add(id_peer)
 
             # 3. Registra a conexão
             with self._lock:
@@ -266,7 +285,7 @@ class GerenciadorConexoesPeer:
             return True
 
         except Exception as e:
-            log.error(f"Erro ao conectar a {id_peer} ({ip}:{porta}): {e}")
+            log.debug(f"Erro ao conectar a {id_peer} ({ip}:{porta}): {e}")
             return False
 
     # =========================================================================
@@ -379,11 +398,13 @@ class GerenciadorConexoesPeer:
                 "ttl": 1,
             }
             self._enviar_mensagem(conexao.socket, mensagem_bye)
+            print(f"[BYE] Enviado para {id_peer}: {motivo}", flush=True)
             
             # Tenta esperar o BYE_OK brevemente
             conexao.socket.settimeout(2.0)
             resp = self._receber_mensagem(conexao.socket)
             if resp and resp.get("type") == "BYE_OK":
+                print(f"[BYE_OK] Recebido de {id_peer}", flush=True)
                 log.info(f"BYE_OK recebido de {id_peer}")
                 
         except Exception:
@@ -463,6 +484,9 @@ class GerenciadorConexoesPeer:
 
                 # 5. BYE -> Responde BYE_OK e fecha
                 elif tipo == "BYE":
+                    motivo = mensagem.get("reason", "Sem motivo")
+                    print(f"\n[BYE] Recebido de {id_peer}: {motivo}")
+                    print("You> ", end="", flush=True)
                     log.info(f"BYE recebido de {id_peer}")
                     self._processar_bye(sock, id_peer, mensagem)
                     break # Sai do loop para fechar conexão
@@ -472,7 +496,7 @@ class GerenciadorConexoesPeer:
                     log.debug(f"Mensagem {tipo} recebida de {id_peer}")
 
         except Exception as e:
-            log.error(f"Erro no loop de recebimento de {id_peer}: {e}")
+            log.debug(f"Erro no loop de recebimento de {id_peer}: {e}")
         finally:
             self._remover_conexao(id_peer)
 

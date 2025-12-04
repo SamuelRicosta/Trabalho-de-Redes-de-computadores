@@ -1,0 +1,16 @@
+{
+  "rendezvous": {
+    "host": "45.171.101.167",
+    "port": 8080
+  },
+  "client": {
+    "namespace": "CIC",
+    "ttl": 7200,
+    "log_level": "ERROR"
+  },
+  "network": {
+    "discover_interval": 10,
+    "ping_interval": 30,
+    "connection_timeout": 5.0
+  }
+}
